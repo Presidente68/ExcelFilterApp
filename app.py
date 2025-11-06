@@ -51,6 +51,17 @@ st.markdown("""
     h1, h2, h3 {
         color: #33808d;
     }
+    
+    /* Stile per il pulsante Reset */
+    div[data-testid="stButton"] button[kind="secondary"] {
+        background-color: #c0152f;
+        color: white;
+    }
+    
+    div[data-testid="stButton"] button[kind="secondary"]:hover {
+        background-color: #a01228;
+        color: white;
+    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -128,12 +139,23 @@ def apply_filter_group(df, filters, group_logic):
     
     return df.loc[list(final_indices)]
 
-# Inizializzazione session state
+def reset_all_filters():
+    """Resetta completamente tutti i filtri e lo stato"""
+    st.session_state.filter_groups = []
+    st.session_state.group_counter = 0
+    st.session_state.global_logic = 'AND'
+    if 'selected_columns' in st.session_state:
+        del st.session_state.selected_columns
+
+# Inizializzazione session state (PERSISTENTE - sopravvive ai refresh)
 if 'filter_groups' not in st.session_state:
     st.session_state.filter_groups = []
 
 if 'group_counter' not in st.session_state:
     st.session_state.group_counter = 0
+
+if 'global_logic' not in st.session_state:
+    st.session_state.global_logic = 'AND'
 
 # Caricamento dati
 DATA_FILE = 'data.xlsx'
@@ -156,51 +178,83 @@ st.sidebar.title("📊 Pannello di Controllo")
 
 # Selezione colonne
 st.sidebar.header("1️⃣ Colonne da Visualizzare")
+
+# Usa session_state per persistenza delle colonne selezionate
+if 'selected_columns' not in st.session_state:
+    st.session_state.selected_columns = columns[:5] if len(columns) >= 5 else columns
+
 selected_columns = st.sidebar.multiselect(
     "Seleziona colonne:",
     options=columns,
-    default=columns[:5] if len(columns) >= 5 else columns,
+    default=st.session_state.selected_columns,
+    key='column_selector',
     help="Scegli quali colonne visualizzare nei risultati"
 )
+
+# Aggiorna session_state quando cambia la selezione
+if selected_columns != st.session_state.selected_columns:
+    st.session_state.selected_columns = selected_columns
 
 st.sidebar.markdown("---")
 
 # Configurazione filtri
 st.sidebar.header("2️⃣ Configurazione Filtri")
 
+# Logica globale (persistente)
 global_logic = st.sidebar.radio(
     "Combina i gruppi di filtri con:",
     options=['AND', 'OR'],
+    index=0 if st.session_state.global_logic == 'AND' else 1,
     help="AND: tutti i gruppi devono essere soddisfatti | OR: almeno un gruppo deve essere soddisfatto"
 )
+
+# Aggiorna session_state
+if global_logic != st.session_state.global_logic:
+    st.session_state.global_logic = global_logic
 
 st.sidebar.markdown("---")
 
 # Gestione gruppi di filtri
 st.sidebar.subheader("Gruppi di Filtri")
 
-# Pulsante per aggiungere gruppo
-if st.sidebar.button("➕ Aggiungi Gruppo di Filtri"):
-    st.session_state.filter_groups.append({
-        'id': st.session_state.group_counter,
-        'logic': 'AND',
-        'filters': []
-    })
-    st.session_state.group_counter += 1
-    st.rerun()
+# Pulsanti per gestione globale
+col1, col2 = st.sidebar.columns(2)
+
+with col1:
+    if st.button("➕ Aggiungi Gruppo", use_container_width=True):
+        st.session_state.filter_groups.append({
+            'id': st.session_state.group_counter,
+            'logic': 'AND',
+            'filters': []
+        })
+        st.session_state.group_counter += 1
+        st.rerun()
+
+with col2:
+    if st.button("🔄 Reset Filtri", use_container_width=True, type="secondary"):
+        reset_all_filters()
+        st.rerun()
 
 # Visualizza i gruppi esistenti
 groups_to_remove = []
 
 for idx, group in enumerate(st.session_state.filter_groups):
     with st.sidebar.expander(f"📁 Gruppo #{group['id'] + 1}", expanded=True):
-        # Logica interna del gruppo
-        group['logic'] = st.radio(
+        # Logica interna del gruppo (persistente)
+        group_logic_key = f"group_logic_{group['id']}"
+        current_logic = group.get('logic', 'AND')
+        
+        new_logic = st.radio(
             "Logica interna:",
             options=['AND', 'OR'],
-            key=f"group_logic_{group['id']}",
+            key=group_logic_key,
+            index=0 if current_logic == 'AND' else 1,
             help="Come combinare i filtri all'interno di questo gruppo"
         )
+        
+        # Aggiorna la logica se è cambiata
+        if new_logic != group['logic']:
+            group['logic'] = new_logic
         
         st.markdown("**Filtri in questo gruppo:**")
         
@@ -213,17 +267,18 @@ for idx, group in enumerate(st.session_state.filter_groups):
             col1, col2 = st.columns([3, 1])
             
             with col1:
-                # Selezione colonna
+                # Selezione colonna (persistente)
+                current_col = filter_config.get('column', columns[0])
                 filter_config['column'] = st.selectbox(
                     "Colonna:",
                     options=columns,
                     key=f"filter_col_{group['id']}_{filter_idx}",
-                    index=columns.index(filter_config['column']) if filter_config.get('column') in columns else 0
+                    index=columns.index(current_col) if current_col in columns else 0
                 )
                 
                 col_type = get_column_type(df_original, filter_config['column'])
                 
-                # Selezione condizione
+                # Selezione condizione (persistente)
                 if col_type == 'number':
                     conditions = {
                         '>': 'maggiore di (>)',
@@ -232,36 +287,45 @@ for idx, group in enumerate(st.session_state.filter_groups):
                         '<=': 'minore o uguale a (<=)',
                         '=': 'uguale a (=)'
                     }
+                    current_cond = filter_config.get('condition', '>')
                 else:
                     conditions = {
                         'in': 'è uno di',
                         'not_in': 'non è uno di'
                     }
+                    current_cond = filter_config.get('condition', 'in')
                 
                 filter_config['condition'] = st.selectbox(
                     "Condizione:",
                     options=list(conditions.keys()),
                     format_func=lambda x: conditions[x],
-                    key=f"filter_cond_{group['id']}_{filter_idx}"
+                    key=f"filter_cond_{group['id']}_{filter_idx}",
+                    index=list(conditions.keys()).index(current_cond) if current_cond in conditions else 0
                 )
                 
-                # Selezione valore
+                # Selezione valore (persistente)
                 if col_type == 'number':
+                    current_value = filter_config.get('value', 0)
                     filter_config['value'] = st.number_input(
                         "Valore:",
                         key=f"filter_val_{group['id']}_{filter_idx}",
-                        value=float(filter_config.get('value', 0))
+                        value=float(current_value) if current_value is not None else 0.0
                     )
                 else:
                     unique_values = df_original[filter_config['column']].unique().tolist()
+                    current_values = filter_config.get('value', [])
+                    if not isinstance(current_values, list):
+                        current_values = []
+                    
                     filter_config['value'] = st.multiselect(
                         "Valori:",
                         options=unique_values,
                         key=f"filter_val_{group['id']}_{filter_idx}",
-                        default=filter_config.get('value', [])
+                        default=current_values
                     )
             
             with col2:
+                st.markdown("<br>", unsafe_allow_html=True)
                 if st.button("🗑️", key=f"remove_filter_{group['id']}_{filter_idx}", help="Rimuovi questo filtro"):
                     filters_to_remove.append(filter_idx)
             
@@ -270,11 +334,12 @@ for idx, group in enumerate(st.session_state.filter_groups):
         # Rimuovi filtri marcati
         for filter_idx in reversed(filters_to_remove):
             group['filters'].pop(filter_idx)
+            st.rerun()
         
         # Pulsanti per gestione gruppo
         col1, col2 = st.columns(2)
         with col1:
-            if st.button("➕ Aggiungi Filtro", key=f"add_filter_{group['id']}"):
+            if st.button("➕ Aggiungi Filtro", key=f"add_filter_{group['id']}", use_container_width=True):
                 group['filters'].append({
                     'column': columns[0],
                     'condition': '>',
@@ -283,7 +348,7 @@ for idx, group in enumerate(st.session_state.filter_groups):
                 st.rerun()
         
         with col2:
-            if st.button("🗑️ Rimuovi Gruppo", key=f"remove_group_{group['id']}"):
+            if st.button("🗑️ Rimuovi Gruppo", key=f"remove_group_{group['id']}", use_container_width=True):
                 groups_to_remove.append(idx)
 
 # Rimuovi gruppi marcati
@@ -293,6 +358,9 @@ for group_idx in reversed(groups_to_remove):
 
 # ============= AREA PRINCIPALE =============
 st.title("📊 Filtro Avanzato Dati Excel")
+
+# Mostra info sulla persistenza
+st.info("💡 **I filtri rimangono attivi anche dopo il refresh della pagina.** Usa il pulsante 'Reset Filtri' per azzerarli completamente.")
 
 # Applica filtri
 df_filtered = df_original.copy()
@@ -309,7 +377,7 @@ if st.session_state.filter_groups:
         group_results.append(set(group_filtered.index))
     
     if group_results:
-        if global_logic == 'AND':
+        if st.session_state.global_logic == 'AND':
             final_indices = set.intersection(*group_results) if group_results else set()
         else:  # OR
             final_indices = set.union(*group_results) if group_results else set()
@@ -324,6 +392,14 @@ else:
 
 # Visualizza risultati
 st.subheader("📋 Risultati")
+
+# Info sui filtri attivi
+if st.session_state.filter_groups:
+    total_filters = sum(len(g['filters']) for g in st.session_state.filter_groups)
+    st.success(f"✅ **{len(st.session_state.filter_groups)} gruppo/i** attivo/i con **{total_filters} filtro/i** totale/i")
+else:
+    st.info("ℹ️ Nessun filtro attivo. Aggiungi un gruppo per iniziare a filtrare.")
+
 st.info(f"Visualizzazione di **{len(df_display)}** righe su **{len(df_original)}** totali")
 
 if not df_display.empty:
@@ -346,4 +422,6 @@ else:
 
 # Info footer
 st.markdown("---")
-st.caption("💡 Suggerimento: Usa la sidebar per configurare filtri complessi con logiche nidificate AND/OR")
+st.caption("💡 **Suggerimento:** I tuoi filtri sono salvati nella sessione e sopravvivono al refresh della pagina. Usa 'Reset Filtri' per ricominciare da zero.")
+
+

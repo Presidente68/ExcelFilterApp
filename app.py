@@ -269,12 +269,24 @@ for idx, group in enumerate(st.session_state.filter_groups):
             with col1:
                 # Selezione colonna (persistente)
                 current_col = filter_config.get('column', columns[0])
-                filter_config['column'] = st.selectbox(
+                new_col = st.selectbox(
                     "Colonna:",
                     options=columns,
                     key=f"filter_col_{group['id']}_{filter_idx}",
                     index=columns.index(current_col) if current_col in columns else 0
                 )
+                
+                # Se la colonna è cambiata, resetta condizione e valore
+                if new_col != filter_config.get('column'):
+                    filter_config['column'] = new_col
+                    # Resetta condizione e valore per il nuovo tipo di colonna
+                    col_type = get_column_type(df_original, new_col)
+                    if col_type == 'number':
+                        filter_config['condition'] = '>'
+                        filter_config['value'] = 0
+                    else:
+                        filter_config['condition'] = 'in'
+                        filter_config['value'] = []
                 
                 col_type = get_column_type(df_original, filter_config['column'])
                 
@@ -288,12 +300,16 @@ for idx, group in enumerate(st.session_state.filter_groups):
                         '=': 'uguale a (=)'
                     }
                     current_cond = filter_config.get('condition', '>')
+                    if current_cond not in conditions:
+                        current_cond = '>'
                 else:
                     conditions = {
                         'in': 'è uno di',
                         'not_in': 'non è uno di'
                     }
                     current_cond = filter_config.get('condition', 'in')
+                    if current_cond not in conditions:
+                        current_cond = 'in'
                 
                 filter_config['condition'] = st.selectbox(
                     "Condizione:",
@@ -306,16 +322,27 @@ for idx, group in enumerate(st.session_state.filter_groups):
                 # Selezione valore (persistente)
                 if col_type == 'number':
                     current_value = filter_config.get('value', 0)
+                    # Assicurati che il valore sia un numero
+                    if not isinstance(current_value, (int, float)):
+                        current_value = 0
+                    
                     filter_config['value'] = st.number_input(
                         "Valore:",
                         key=f"filter_val_{group['id']}_{filter_idx}",
-                        value=float(current_value) if current_value is not None else 0.0
+                        value=float(current_value),
+                        step=0.01
                     )
                 else:
-                    unique_values = df_original[filter_config['column']].unique().tolist()
+                    unique_values = df_original[filter_config['column']].dropna().unique().tolist()
+                    # Converti tutti i valori in stringhe per uniformità
+                    unique_values = [str(v) for v in unique_values]
+                    unique_values.sort()
+                    
                     current_values = filter_config.get('value', [])
                     if not isinstance(current_values, list):
                         current_values = []
+                    # Assicurati che i valori salvati siano stringhe
+                    current_values = [str(v) for v in current_values if str(v) in unique_values]
                     
                     filter_config['value'] = st.multiselect(
                         "Valori:",
@@ -340,11 +367,24 @@ for idx, group in enumerate(st.session_state.filter_groups):
         col1, col2 = st.columns(2)
         with col1:
             if st.button("➕ Aggiungi Filtro", key=f"add_filter_{group['id']}", use_container_width=True):
-                group['filters'].append({
-                    'column': columns[0],
-                    'condition': '>',
-                    'value': 0
-                })
+                # Determina i valori di default in base al tipo della prima colonna
+                first_col = columns[0]
+                col_type = get_column_type(df_original, first_col)
+                
+                if col_type == 'number':
+                    default_filter = {
+                        'column': first_col,
+                        'condition': '>',
+                        'value': 0
+                    }
+                else:
+                    default_filter = {
+                        'column': first_col,
+                        'condition': 'in',
+                        'value': []
+                    }
+                
+                group['filters'].append(default_filter)
                 st.rerun()
         
         with col2:
@@ -423,5 +463,6 @@ else:
 # Info footer
 st.markdown("---")
 st.caption("💡 **Suggerimento:** I tuoi filtri sono salvati nella sessione e sopravvivono al refresh della pagina. Usa 'Reset Filtri' per ricominciare da zero.")
+
 
 

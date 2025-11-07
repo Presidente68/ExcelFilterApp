@@ -88,28 +88,83 @@ st.markdown("""
         color: #33808d;
     }
     
-    /* Stile per tabella con colonne bloccate */
-    .dataframe-container {
-        position: relative;
-        overflow-x: auto;
-    }
-    
-    /* Intestazioni più piccole */
+    /* Intestazioni con testo a capo e altezza aumentata */
     .dataframe thead th {
-        font-size: 0.75rem !important;
-        line-height: 1.2 !important;
+        font-size: 0.7rem !important;
+        line-height: 1.1 !important;
         white-space: normal !important;
         word-wrap: break-word !important;
-        padding: 6px 4px !important;
+        padding: 8px 4px !important;
+        vertical-align: middle !important;
+        min-height: 60px !important;
+        height: auto !important;
     }
     
     /* Celle dati compatte */
     .dataframe tbody td {
         white-space: nowrap !important;
         padding: 6px 4px !important;
+        font-size: 0.85rem !important;
+    }
+    
+    /* Colonne bloccate (sticky) */
+    .dataframe thead th:nth-child(1),
+    .dataframe tbody td:nth-child(1) {
+        position: sticky !important;
+        left: 0 !important;
+        z-index: 10 !important;
+        background-color: var(--color-surface, white) !important;
+        border-right: 2px solid rgba(51, 128, 141, 0.3) !important;
+    }
+    
+    .dataframe thead th:nth-child(2),
+    .dataframe tbody td:nth-child(2) {
+        position: sticky !important;
+        left: 60px !important;
+        z-index: 10 !important;
+        background-color: var(--color-surface, white) !important;
+        border-right: 2px solid rgba(51, 128, 141, 0.3) !important;
+    }
+    
+    .dataframe thead th:nth-child(3),
+    .dataframe tbody td:nth-child(3) {
+        position: sticky !important;
+        left: 260px !important;
+        z-index: 10 !important;
+        background-color: var(--color-surface, white) !important;
+        border-right: 2px solid rgba(51, 128, 141, 0.3) !important;
+    }
+    
+    /* Header delle colonne bloccate */
+    .dataframe thead th:nth-child(1),
+    .dataframe thead th:nth-child(2),
+    .dataframe thead th:nth-child(3) {
+        background-color: #33808d !important;
+        color: white !important;
+        z-index: 20 !important;
+    }
+    
+    /* Dark mode support */
+    @media (prefers-color-scheme: dark) {
+        .dataframe thead th:nth-child(1),
+        .dataframe tbody td:nth-child(1),
+        .dataframe thead th:nth-child(2),
+        .dataframe tbody td:nth-child(2),
+        .dataframe thead th:nth-child(3),
+        .dataframe tbody td:nth-child(3) {
+            background-color: #1f2121 !important;
+        }
+        
+        .dataframe thead th:nth-child(1),
+        .dataframe thead th:nth-child(2),
+        .dataframe thead th:nth-child(3) {
+            background-color: #134252 !important;
+        }
     }
 </style>
 """, unsafe_allow_html=True)
+
+# ... [tutte le funzioni helper rimangono uguali] ...
 
 # Funzioni helper
 @st.cache_data
@@ -127,19 +182,7 @@ def get_column_type(df, col_name):
     return 'number' if pd.api.types.is_numeric_dtype(df[col_name]) else 'text'
 
 def format_value(val, col_name):
-    """
-    Formatta i valori in base al nome della colonna
-    
-    Regole di formattazione:
-    - Partite Analizzate: Numero intero con separatore migliaia
-    - Frequenza Storica, %Cum Freq Storica Serie, SMA/EMA Attuale: Percentuale senza decimali
-    - Quota Equa: Decimale con due decimali
-    - Ritardo Attuale, Prima/Dopo Media Consec Actual: Numero intero
-    - Z-Score (tutti): Decimale con due decimali
-    - Media strisce Forza/Debolezza: Numero intero arrotondato
-    - Lunghezza ciclo Forza/Debolezza: Numero intero
-    - Div, Nome Mercato, Z-Sc. Valore 3X, Z-Sc. Deb_5-10: Testo
-    """
+    """Formatta i valori in base al nome della colonna"""
     if pd.isna(val):
         return ''
     
@@ -201,15 +244,7 @@ def format_value(val, col_name):
     return str(val)
 
 def apply_conditional_formatting(val, col_name):
-    """
-    Applica formattazione condizionale basata sul valore e nome colonna
-    
-    Regole:
-    - Z-Score Ritardi Consecutivi: >=2 verde chiaro, >=3 verde scuro
-    - Z-Score Valore: <=-2 verde chiaro, <=-3 verde scuro
-    - Z-Score ciclo Debolezza: >=2 verde chiaro, >=3 verde scuro
-    - Z-Score ciclo Forza: >=2 arancio, >=3 rosso
-    """
+    """Applica formattazione condizionale basata sul valore e nome colonna"""
     if pd.isna(val) or not isinstance(val, (int, float)):
         return ''
     
@@ -244,13 +279,7 @@ def apply_conditional_formatting(val, col_name):
     return ''
 
 def get_column_width(col_name):
-    """
-    Restituisce la larghezza ottimale per ciascuna colonna
-    
-    - Nome Mercato: larghezza adattata al contenuto più lungo
-    - Colonne numeriche: larghezza compatta
-    - Altre colonne: larghezza di default
-    """
+    """Restituisce la larghezza ottimale per ciascuna colonna"""
     # Colonne bloccate e Nome Mercato con larghezza maggiore
     if col_name == 'Nome Mercato':
         return 200  # Larghezza per il contenuto più lungo
@@ -321,10 +350,8 @@ def apply_filter_group(df, filters, group_logic):
         return df
     
     if group_logic == 'AND':
-        # Intersezione di tutti i set
         final_indices = set.intersection(*results)
     else:  # OR
-        # Unione di tutti i set
         final_indices = set.union(*results)
     
     return df.loc[list(final_indices)]
@@ -366,7 +393,7 @@ columns = df_original.columns.tolist()
 # ============= SIDEBAR =============
 st.sidebar.title("📊 Pannello di Controllo")
 
-# LEGENDA - Prima di tutto per facile accesso
+# LEGENDA
 with st.sidebar.expander("📖 Legenda Indicatori", expanded=False):
     st.markdown("""
     <div class="legenda-section">
@@ -432,7 +459,6 @@ st.sidebar.markdown("---")
 # Selezione colonne
 st.sidebar.header("1️⃣ Colonne da Visualizzare")
 
-# Usa session_state per persistenza delle colonne selezionate
 if 'selected_columns' not in st.session_state:
     st.session_state.selected_columns = columns[:5] if len(columns) >= 5 else columns
 
@@ -444,7 +470,6 @@ selected_columns = st.sidebar.multiselect(
     help="Scegli quali colonne visualizzare nei risultati"
 )
 
-# Aggiorna session_state quando cambia la selezione
 if selected_columns != st.session_state.selected_columns:
     st.session_state.selected_columns = selected_columns
 
@@ -453,7 +478,6 @@ st.sidebar.markdown("---")
 # Configurazione filtri
 st.sidebar.header("2️⃣ Configurazione Filtri")
 
-# Logica globale (persistente)
 global_logic = st.sidebar.radio(
     "Combina i gruppi di filtri con:",
     options=['AND', 'OR'],
@@ -461,7 +485,6 @@ global_logic = st.sidebar.radio(
     help="AND: tutti i gruppi devono essere soddisfatti | OR: almeno un gruppo deve essere soddisfatto"
 )
 
-# Aggiorna session_state
 if global_logic != st.session_state.global_logic:
     st.session_state.global_logic = global_logic
 
@@ -470,7 +493,6 @@ st.sidebar.markdown("---")
 # Gestione gruppi di filtri
 st.sidebar.subheader("Gruppi di Filtri")
 
-# Pulsanti per gestione globale
 col1, col2 = st.sidebar.columns(2)
 
 with col1:
@@ -488,12 +510,10 @@ with col2:
         reset_all_filters()
         st.rerun()
 
-# Visualizza i gruppi esistenti
 groups_to_remove = []
 
 for idx, group in enumerate(st.session_state.filter_groups):
     with st.sidebar.expander(f"📁 Gruppo #{group['id'] + 1}", expanded=True):
-        # Logica interna del gruppo (persistente)
         group_logic_key = f"group_logic_{group['id']}"
         current_logic = group.get('logic', 'AND')
         
@@ -505,13 +525,11 @@ for idx, group in enumerate(st.session_state.filter_groups):
             help="Come combinare i filtri all'interno di questo gruppo"
         )
         
-        # Aggiorna la logica se è cambiata
         if new_logic != group['logic']:
             group['logic'] = new_logic
         
         st.markdown("**Filtri in questo gruppo:**")
         
-        # Gestione filtri del gruppo
         filters_to_remove = []
         
         for filter_idx, filter_config in enumerate(group['filters']):
@@ -520,7 +538,6 @@ for idx, group in enumerate(st.session_state.filter_groups):
             col1, col2 = st.columns([3, 1])
             
             with col1:
-                # Selezione colonna (persistente)
                 current_col = filter_config.get('column', columns[0])
                 new_col = st.selectbox(
                     "Colonna:",
@@ -529,10 +546,8 @@ for idx, group in enumerate(st.session_state.filter_groups):
                     index=columns.index(current_col) if current_col in columns else 0
                 )
                 
-                # Se la colonna è cambiata, resetta condizione e valore
                 if new_col != filter_config.get('column'):
                     filter_config['column'] = new_col
-                    # Resetta condizione e valore per il nuovo tipo di colonna
                     col_type = get_column_type(df_original, new_col)
                     if col_type == 'number':
                         filter_config['condition'] = '>'
@@ -543,7 +558,6 @@ for idx, group in enumerate(st.session_state.filter_groups):
                 
                 col_type = get_column_type(df_original, filter_config['column'])
                 
-                # Selezione condizione (persistente)
                 if col_type == 'number':
                     conditions = {
                         '>': 'maggiore di (>)',
@@ -572,10 +586,8 @@ for idx, group in enumerate(st.session_state.filter_groups):
                     index=list(conditions.keys()).index(current_cond) if current_cond in conditions else 0
                 )
                 
-                # Selezione valore (persistente)
                 if col_type == 'number':
                     current_value = filter_config.get('value', 0)
-                    # Assicurati che il valore sia un numero
                     if not isinstance(current_value, (int, float)):
                         current_value = 0
                     
@@ -587,14 +599,12 @@ for idx, group in enumerate(st.session_state.filter_groups):
                     )
                 else:
                     unique_values = df_original[filter_config['column']].dropna().unique().tolist()
-                    # Converti tutti i valori in stringhe per uniformità
                     unique_values = [str(v) for v in unique_values]
                     unique_values.sort()
                     
                     current_values = filter_config.get('value', [])
                     if not isinstance(current_values, list):
                         current_values = []
-                    # Assicurati che i valori salvati siano stringhe
                     current_values = [str(v) for v in current_values if str(v) in unique_values]
                     
                     filter_config['value'] = st.multiselect(
@@ -611,16 +621,13 @@ for idx, group in enumerate(st.session_state.filter_groups):
             
             st.markdown("---")
         
-        # Rimuovi filtri marcati
         for filter_idx in reversed(filters_to_remove):
             group['filters'].pop(filter_idx)
             st.rerun()
         
-        # Pulsanti per gestione gruppo
         col1, col2 = st.columns(2)
         with col1:
             if st.button("➕ Aggiungi Filtro", key=f"add_filter_{group['id']}", use_container_width=True):
-                # Determina i valori di default in base al tipo della prima colonna
                 first_col = columns[0]
                 col_type = get_column_type(df_original, first_col)
                 
@@ -644,7 +651,6 @@ for idx, group in enumerate(st.session_state.filter_groups):
             if st.button("🗑️ Rimuovi Gruppo", key=f"remove_group_{group['id']}", use_container_width=True):
                 groups_to_remove.append(idx)
 
-# Rimuovi gruppi marcati
 for group_idx in reversed(groups_to_remove):
     st.session_state.filter_groups.pop(group_idx)
     st.rerun()
@@ -652,7 +658,6 @@ for group_idx in reversed(groups_to_remove):
 # ============= AREA PRINCIPALE =============
 st.title("📊 Filtro Avanzato Dati Excel")
 
-# Mostra info sulla persistenza
 st.info("💡 **I filtri rimangono attivi anche dopo il refresh della pagina.** Usa il pulsante 'Reset Filtri' per azzerarli completamente.")
 
 # Applica filtri
@@ -686,7 +691,6 @@ else:
 # Visualizza risultati
 st.subheader("📋 Risultati")
 
-# Info sui filtri attivi
 if st.session_state.filter_groups:
     total_filters = sum(len(g['filters']) for g in st.session_state.filter_groups)
     st.success(f"✅ **{len(st.session_state.filter_groups)} gruppo/i** attivo/i con **{total_filters} filtro/i** totale/i")
@@ -696,20 +700,37 @@ else:
 st.info(f"Visualizzazione di **{len(df_display)}** righe su **{len(df_original)}** totali")
 
 if not df_display.empty:
-    # Applica formattazione condizionale (colori) e formattazione valori
-    # Crea un formatter personalizzato per ogni colonna
+    # Riordina colonne: bloccate all'inizio
+    pinned_cols = []
+    other_cols = []
+    
+    if 'Div' in selected_columns:
+        pinned_cols.append('Div')
+    if 'Nome Mercato' in selected_columns:
+        pinned_cols.append('Nome Mercato')
+    if 'Frequenza Storica' in selected_columns:
+        pinned_cols.append('Frequenza Storica')
+    
+    for col in selected_columns:
+        if col not in pinned_cols:
+            other_cols.append(col)
+    
+    column_order = pinned_cols + other_cols
+    df_display_ordered = df_display[column_order]
+    
+    # Applica formattazione
     formatters = {}
-    for col in df_display.columns:
+    for col in column_order:
         formatters[col] = lambda x, c=col: format_value(x, c)
     
-    styled_df = df_display.style.apply(
+    styled_df = df_display_ordered.style.apply(
         lambda col: [apply_conditional_formatting(val, col.name) for val in col],
         axis=0
     ).format(formatters)
     
     # Configura larghezze colonne
     column_config = {}
-    for col in selected_columns:
+    for col in column_order:
         width = get_column_width(col)
         column_config[col] = st.column_config.Column(
             col,
@@ -738,6 +759,7 @@ else:
 # Info footer
 st.markdown("---")
 st.caption("💡 **Suggerimento:** I tuoi filtri sono salvati nella sessione e sopravvivono al refresh della pagina. Usa 'Reset Filtri' per ricominciare da zero.")
+
 
 
 

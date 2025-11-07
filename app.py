@@ -696,18 +696,16 @@ else:
 st.info(f"Visualizzazione di **{len(df_display)}** righe su **{len(df_original)}** totali")
 
 if not df_display.empty:
-    # Crea copia del dataframe per la formattazione
-    df_formatted = df_display.copy()
+    # Applica formattazione condizionale (colori) e formattazione valori
+    # Crea un formatter personalizzato per ogni colonna
+    formatters = {}
+    for col in df_display.columns:
+        formatters[col] = lambda x, c=col: format_value(x, c)
     
-    # Applica formattazione dei valori
-    for col in df_formatted.columns:
-        df_formatted[col] = df_formatted[col].apply(lambda x: format_value(x, col))
-    
-    # Applica formattazione condizionale (colori)
     styled_df = df_display.style.apply(
         lambda col: [apply_conditional_formatting(val, col.name) for val in col],
         axis=0
-    ).format(lambda x, col_name: format_value(x, col_name))
+    ).format(formatters)
     
     # Configura larghezze colonne
     column_config = {}
@@ -717,15 +715,6 @@ if not df_display.empty:
             col,
             width=width
         )
-    
-    # Definisci le colonne bloccate (pinned)
-    pinned_columns = []
-    if 'Div' in selected_columns:
-        pinned_columns.append('Div')
-    if 'Nome Mercato' in selected_columns:
-        pinned_columns.append('Nome Mercato')
-    if 'Frequenza Storica' in selected_columns:
-        pinned_columns.append('Frequenza Storica')
     
     st.dataframe(
         styled_df,
@@ -749,6 +738,7 @@ else:
 # Info footer
 st.markdown("---")
 st.caption("💡 **Suggerimento:** I tuoi filtri sono salvati nella sessione e sopravvivono al refresh della pagina. Usa 'Reset Filtri' per ricominciare da zero.")
+
 
 
 

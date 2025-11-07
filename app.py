@@ -62,6 +62,31 @@ st.markdown("""
         background-color: #a01228;
         color: white;
     }
+    
+    /* Stile per la legenda */
+    .legenda-section {
+        font-size: 0.9rem;
+        line-height: 1.6;
+    }
+    
+    .legenda-section h4 {
+        color: #33808d;
+        margin-top: 1rem;
+        margin-bottom: 0.5rem;
+        font-size: 1rem;
+    }
+    
+    .legenda-section ul {
+        margin-left: 1rem;
+    }
+    
+    .legenda-section li {
+        margin-bottom: 0.5rem;
+    }
+    
+    .legenda-section strong {
+        color: #33808d;
+    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -175,6 +200,57 @@ columns = df_original.columns.tolist()
 
 # ============= SIDEBAR =============
 st.sidebar.title("📊 Pannello di Controllo")
+
+# LEGENDA - Prima di tutto per facile accesso
+with st.sidebar.expander("📖 Legenda Indicatori", expanded=False):
+    st.markdown("""
+    <div class="legenda-section">
+    
+    #### 📈 Indicatori Tecnici
+    
+    **SMA (Simple Moving Average)**  
+    Media mobile semplice. SMA50 Attuale è la frequenza dell'evento nelle ultime 50 partite. Dà lo stesso peso a ogni partita.
+    
+    **EMA (Exponential Moving Average)**  
+    Media mobile esponenziale. Simile alla SMA, ma dà più peso alle partite più recenti, rendendola più reattiva ai cambiamenti.
+    
+    **Z-Score: Valore vs. Ciclo**
+    
+    - **Z-Score Valore** (es. Z-Score Valore SMA50): Misura la velocità/intensità del trend. Un valore molto negativo (es. -2.5) indica un ritardo intenso e recente.
+    
+    - **Z-Score ciclo Debolezza/Forza**: Misura la durata/persistenza del trend. Un valore molto positivo (es. +3.0) indica un ciclo di debolezza o forza eccezionalmente lungo.
+    
+    **Come si attivano i cicli di Debolezza e Forza**  
+    ⚠️ Importante: i cicli non iniziano al semplice superamento della media.
+    
+    - Un **ciclo di Debolezza** inizia solo quando la media mobile scende sotto: **Media Storica - 1 Deviazione Standard**.
+    
+    - Un **ciclo di Forza** inizia solo quando la media mobile sale sopra: **Media Storica + 1 Deviazione Standard**.
+    
+    ---
+    
+    #### 📋 Indicatori di Base
+    
+    **Div**: Il campionato di riferimento (es. I1 = Serie A).
+    
+    **Nome Mercato**: Il tipo di scommessa e l'eventuale classe di quote.
+    
+    **Frequenza Storica**: La percentuale di volte che l'evento si è verificato.
+    
+    **Quota Equa**: La quota "giusta" calcolata dalla Frequenza Storica.
+    
+    **Ritardo Attuale**: Da quante partite consecutive l'evento NON si sta verificando.
+    
+    **Z-Score Ritardi Consecutivi**: Misura la rarità statistica della sequenza di serie "anomale". Valori > 2 indicano una situazione molto rara.
+    
+    **Z-Sc. Valore 3X**: Almeno 3 Z-Sc. Valore SMA tra 5 e 50 sono < -2 (forte ritardo)
+    
+    **Z-Sc. Deb_5-10**: gli Z-Score sui CICLI di Deb.za SMA5 E EMA10 sono >2 (Forte ritardo consecutivo oltre 1 dev std)
+    
+    </div>
+    """, unsafe_allow_html=True)
+
+st.sidebar.markdown("---")
 
 # Selezione colonne
 st.sidebar.header("1️⃣ Colonne da Visualizzare")
@@ -463,6 +539,7 @@ else:
 # Info footer
 st.markdown("---")
 st.caption("💡 **Suggerimento:** I tuoi filtri sono salvati nella sessione e sopravvivono al refresh della pagina. Usa 'Reset Filtri' per ricominciare da zero.")
+
 
 
 

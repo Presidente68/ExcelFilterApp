@@ -87,6 +87,27 @@ st.markdown("""
     .legenda-section strong {
         color: #33808d;
     }
+    
+    /* Stile per tabella con colonne bloccate */
+    .dataframe-container {
+        position: relative;
+        overflow-x: auto;
+    }
+    
+    /* Intestazioni più piccole */
+    .dataframe thead th {
+        font-size: 0.75rem !important;
+        line-height: 1.2 !important;
+        white-space: normal !important;
+        word-wrap: break-word !important;
+        padding: 6px 4px !important;
+    }
+    
+    /* Celle dati compatte */
+    .dataframe tbody td {
+        white-space: nowrap !important;
+        padding: 6px 4px !important;
+    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -104,6 +125,80 @@ def load_excel_data(file_path):
 def get_column_type(df, col_name):
     """Determina se una colonna è numerica o testuale"""
     return 'number' if pd.api.types.is_numeric_dtype(df[col_name]) else 'text'
+
+def format_value(val, col_name):
+    """
+    Formatta i valori in base al nome della colonna
+    
+    Regole di formattazione:
+    - Partite Analizzate: Numero intero con separatore migliaia
+    - Frequenza Storica, %Cum Freq Storica Serie, SMA/EMA Attuale: Percentuale senza decimali
+    - Quota Equa: Decimale con due decimali
+    - Ritardo Attuale, Prima/Dopo Media Consec Actual: Numero intero
+    - Z-Score (tutti): Decimale con due decimali
+    - Media strisce Forza/Debolezza: Numero intero arrotondato
+    - Lunghezza ciclo Forza/Debolezza: Numero intero
+    - Div, Nome Mercato, Z-Sc. Valore 3X, Z-Sc. Deb_5-10: Testo
+    """
+    if pd.isna(val):
+        return ''
+    
+    # Testo senza formattazione
+    text_columns = ['Div', 'Nome Mercato', 'Z-Sc. Valore 3X', 'Z-Sc. Deb_5-10', 
+                    'PQS', 'Veto', 'Appetibilità_Fondo', 'Semaforo_Momentum',
+                    'Appetibilità_Medio', 'PET', 'Stato_Forza_Fondo', 
+                    'Semaforo_Momentum_Inverso', 'Stato_Forza_Medio']
+    
+    if col_name in text_columns:
+        return str(val)
+    
+    # Numero intero con separatore migliaia
+    if 'Partite Analizzate' in col_name:
+        try:
+            return f"{int(val):,}".replace(',', '.')
+        except:
+            return str(val)
+    
+    # Percentuale senza decimali
+    if any(keyword in col_name for keyword in ['Frequenza Storica', '%Cum Freq Storica Serie', 'SMA', 'EMA']) and 'Attuale' in col_name or col_name == 'Frequenza Storica':
+        try:
+            return f"{val * 100:.0f}%"
+        except:
+            return str(val)
+    
+    # Quota Equa: due decimali
+    if 'Quota Equa' in col_name:
+        try:
+            return f"{val:.2f}"
+        except:
+            return str(val)
+    
+    # Ritardo Attuale e Prima/Dopo: numero intero
+    if 'Ritardo Attuale' in col_name or 'Prima/Dopo Media Consec Actual' in col_name:
+        try:
+            return f"{int(val)}"
+        except:
+            return str(val)
+    
+    # Z-Score: due decimali
+    if 'Z-Score' in col_name:
+        try:
+            return f"{val:.2f}"
+        except:
+            return str(val)
+    
+    # Media stripes e Lunghezza ciclo: numero intero
+    if 'Media strisce' in col_name or 'Lunghezza ciclo' in col_name:
+        try:
+            return f"{int(round(val))}"
+        except:
+            return str(val)
+    
+    # Default: numero con 2 decimali se numerico, altrimenti testo
+    if isinstance(val, (int, float)):
+        return f"{val:.2f}"
+    
+    return str(val)
 
 def apply_conditional_formatting(val, col_name):
     """
@@ -132,14 +227,14 @@ def apply_conditional_formatting(val, col_name):
         elif val <= -2:
             return 'background-color: #90ee90; color: #1a5c3a; font-weight: bold;'
     
-    # Z-Score ciclo Debolezza - VERDE (non rosso/arancio!)
+    # Z-Score ciclo Debolezza - VERDE (opportunità)
     if 'Z-Score ciclo Debolezza' in col_name:
         if val >= 3:
             return 'background-color: #2d8659; color: white; font-weight: bold;'
         elif val >= 2:
             return 'background-color: #90ee90; color: #1a5c3a; font-weight: bold;'
     
-    # Z-Score ciclo Forza - ARANCIO/ROSSO
+    # Z-Score ciclo Forza - ARANCIO/ROSSO (allerta)
     if 'Z-Score ciclo Forza' in col_name or 'Z-Score ciclo  Forza' in col_name:
         if val >= 3:
             return 'background-color: #d32f2f; color: white; font-weight: bold;'
@@ -147,6 +242,33 @@ def apply_conditional_formatting(val, col_name):
             return 'background-color: #ff9800; color: white; font-weight: bold;'
     
     return ''
+
+def get_column_width(col_name):
+    """
+    Restituisce la larghezza ottimale per ciascuna colonna
+    
+    - Nome Mercato: larghezza adattata al contenuto più lungo
+    - Colonne numeriche: larghezza compatta
+    - Altre colonne: larghezza di default
+    """
+    # Colonne bloccate e Nome Mercato con larghezza maggiore
+    if col_name == 'Nome Mercato':
+        return 200  # Larghezza per il contenuto più lungo
+    elif col_name == 'Div':
+        return 60
+    elif col_name == 'Frequenza Storica':
+        return 80
+    
+    # Colonne numeriche compatte
+    numeric_compact = ['Partite Analizzate', 'Quota Equa', 'Ritardo Attuale', 
+                      'Prima/Dopo Media Consec Actual', 'SMA', 'EMA', 'Z-Score',
+                      'Media strisce', 'Lunghezza ciclo', 'PET', 'PQS']
+    
+    if any(keyword in col_name for keyword in numeric_compact):
+        return 85  # Larghezza compatta per numeri
+    
+    # Default
+    return 100
 
 def apply_single_filter(df, col_name, condition, value):
     """Applica un singolo filtro al dataframe"""
@@ -574,16 +696,43 @@ else:
 st.info(f"Visualizzazione di **{len(df_display)}** righe su **{len(df_original)}** totali")
 
 if not df_display.empty:
-    # Applica formattazione condizionale
+    # Crea copia del dataframe per la formattazione
+    df_formatted = df_display.copy()
+    
+    # Applica formattazione dei valori
+    for col in df_formatted.columns:
+        df_formatted[col] = df_formatted[col].apply(lambda x: format_value(x, col))
+    
+    # Applica formattazione condizionale (colori)
     styled_df = df_display.style.apply(
         lambda col: [apply_conditional_formatting(val, col.name) for val in col],
         axis=0
-    )
+    ).format(lambda x, col_name: format_value(x, col_name))
+    
+    # Configura larghezze colonne
+    column_config = {}
+    for col in selected_columns:
+        width = get_column_width(col)
+        column_config[col] = st.column_config.Column(
+            col,
+            width=width
+        )
+    
+    # Definisci le colonne bloccate (pinned)
+    pinned_columns = []
+    if 'Div' in selected_columns:
+        pinned_columns.append('Div')
+    if 'Nome Mercato' in selected_columns:
+        pinned_columns.append('Nome Mercato')
+    if 'Frequenza Storica' in selected_columns:
+        pinned_columns.append('Frequenza Storica')
     
     st.dataframe(
         styled_df,
         use_container_width=True,
-        height=600
+        height=600,
+        column_config=column_config,
+        hide_index=True
     )
     
     # Opzione per scaricare i risultati

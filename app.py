@@ -10,7 +10,7 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# CSS personalizzato per mobile-first
+# CSS personalizzato per mobile-first e formattazione condizionale
 st.markdown("""
 <style>
     /* Mobile-first responsive design */
@@ -104,6 +104,49 @@ def load_excel_data(file_path):
 def get_column_type(df, col_name):
     """Determina se una colonna è numerica o testuale"""
     return 'number' if pd.api.types.is_numeric_dtype(df[col_name]) else 'text'
+
+def apply_conditional_formatting(val, col_name):
+    """
+    Applica formattazione condizionale basata sul valore e nome colonna
+    
+    Regole:
+    - Z-Score Ritardi Consecutivi: >=2 verde chiaro, >=3 verde scuro
+    - Z-Score Valore: <=-2 verde chiaro, <=-3 verde scuro
+    - Z-Score ciclo Debolezza: >=2 verde chiaro, >=3 verde scuro
+    - Z-Score ciclo Forza: >=2 arancio, >=3 rosso
+    """
+    if pd.isna(val) or not isinstance(val, (int, float)):
+        return ''
+    
+    # Z-Score Ritardi Consecutivi
+    if 'Z-Score Ritardi Consecutivi' in col_name:
+        if val >= 3:
+            return 'background-color: #2d8659; color: white; font-weight: bold;'
+        elif val >= 2:
+            return 'background-color: #90ee90; color: #1a5c3a; font-weight: bold;'
+    
+    # Z-Score Valore (qualsiasi SMA/EMA)
+    if 'Z-Score Valore' in col_name:
+        if val <= -3:
+            return 'background-color: #2d8659; color: white; font-weight: bold;'
+        elif val <= -2:
+            return 'background-color: #90ee90; color: #1a5c3a; font-weight: bold;'
+    
+    # Z-Score ciclo Debolezza - VERDE (non rosso/arancio!)
+    if 'Z-Score ciclo Debolezza' in col_name:
+        if val >= 3:
+            return 'background-color: #2d8659; color: white; font-weight: bold;'
+        elif val >= 2:
+            return 'background-color: #90ee90; color: #1a5c3a; font-weight: bold;'
+    
+    # Z-Score ciclo Forza - ARANCIO/ROSSO
+    if 'Z-Score ciclo Forza' in col_name or 'Z-Score ciclo  Forza' in col_name:
+        if val >= 3:
+            return 'background-color: #d32f2f; color: white; font-weight: bold;'
+        elif val >= 2:
+            return 'background-color: #ff9800; color: white; font-weight: bold;'
+    
+    return ''
 
 def apply_single_filter(df, col_name, condition, value):
     """Applica un singolo filtro al dataframe"""
@@ -246,6 +289,18 @@ with st.sidebar.expander("📖 Legenda Indicatori", expanded=False):
     **Z-Sc. Valore 3X**: Almeno 3 Z-Sc. Valore SMA tra 5 e 50 sono < -2 (forte ritardo)
     
     **Z-Sc. Deb_5-10**: gli Z-Score sui CICLI di Deb.za SMA5 E EMA10 sono >2 (Forte ritardo consecutivo oltre 1 dev std)
+    
+    ---
+    
+    #### 🎨 Legenda Colori
+    
+    **Verde chiaro/scuro**: Valori positivi (opportunità)
+    - Z-Score Ritardi: ≥2 (chiaro), ≥3 (scuro)
+    - Z-Score Valore: ≤-2 (chiaro), ≤-3 (scuro)
+    - Z-Score ciclo Debolezza: ≥2 (chiaro), ≥3 (scuro)
+    
+    **Arancio/Rosso**: Valori di allerta
+    - Z-Score ciclo Forza: ≥2 (arancio), ≥3 (rosso)
     
     </div>
     """, unsafe_allow_html=True)
@@ -519,8 +574,14 @@ else:
 st.info(f"Visualizzazione di **{len(df_display)}** righe su **{len(df_original)}** totali")
 
 if not df_display.empty:
+    # Applica formattazione condizionale
+    styled_df = df_display.style.apply(
+        lambda col: [apply_conditional_formatting(val, col.name) for val in col],
+        axis=0
+    )
+    
     st.dataframe(
-        df_display,
+        styled_df,
         use_container_width=True,
         height=600
     )

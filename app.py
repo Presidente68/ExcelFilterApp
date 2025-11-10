@@ -164,8 +164,6 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# ... [tutte le funzioni helper rimangono uguali] ...
-
 # Funzioni helper
 @st.cache_data
 def load_excel_data(file_path):
@@ -203,7 +201,7 @@ def format_value(val, col_name):
             return str(val)
     
     # Percentuale senza decimali
-    if any(keyword in col_name for keyword in ['Frequenza Storica', '%Cum Freq Storica Serie', 'SMA', 'EMA']) and 'Attuale' in col_name or col_name == 'Frequenza Storica':
+    if (any(keyword in col_name for keyword in ['Frequenza Storica', '%Cum Freq Storica Serie', 'MM', 'EM']) and 'Act' in col_name) or col_name == 'Frequenza Storica':
         try:
             return f"{val * 100:.0f}%"
         except:
@@ -217,21 +215,21 @@ def format_value(val, col_name):
             return str(val)
     
     # Ritardo Attuale e Prima/Dopo: numero intero
-    if 'Ritardo Attuale' in col_name or 'Prima/Dopo Media Consec Actual' in col_name:
+    if 'Ritardo Act' in col_name or 'Prima/Dopo Media Consec Act' in col_name:
         try:
             return f"{int(val)}"
         except:
             return str(val)
     
-    # Z-Score: due decimali
-    if 'Z-Score' in col_name:
+    # Z-Score e derivati: due decimali
+    if 'Z-Score' in col_name or col_name.startswith('ZS'):
         try:
             return f"{val:.2f}"
         except:
             return str(val)
     
     # Media stripes e Lunghezza ciclo: numero intero
-    if 'Media strisce' in col_name or 'Lunghezza ciclo' in col_name:
+    if col_name.startswith('MSt') or col_name.startswith('LDeb') or col_name.startswith('LFz'):
         try:
             return f"{int(round(val))}"
         except:
@@ -255,22 +253,22 @@ def apply_conditional_formatting(val, col_name):
         elif val >= 2:
             return 'background-color: #90ee90; color: #1a5c3a; font-weight: bold;'
     
-    # Z-Score Valore (qualsiasi SMA/EMA)
-    if 'Z-Score Valore' in col_name:
+    # Z-Score Valore (ZSVal)
+    if col_name.startswith('ZSVal'):
         if val <= -3:
             return 'background-color: #2d8659; color: white; font-weight: bold;'
         elif val <= -2:
             return 'background-color: #90ee90; color: #1a5c3a; font-weight: bold;'
     
-    # Z-Score ciclo Debolezza - VERDE (opportunità)
-    if 'Z-Score ciclo Debolezza' in col_name:
+    # Z-Score ciclo Debolezza (ZSDeb) - VERDE (opportunità)
+    if col_name.startswith('ZSDeb'):
         if val >= 3:
             return 'background-color: #2d8659; color: white; font-weight: bold;'
         elif val >= 2:
             return 'background-color: #90ee90; color: #1a5c3a; font-weight: bold;'
     
-    # Z-Score ciclo Forza - ARANCIO/ROSSO (allerta)
-    if 'Z-Score ciclo Forza' in col_name or 'Z-Score ciclo  Forza' in col_name:
+    # Z-Score ciclo Forza (ZSFz) - ARANCIO/ROSSO (allerta)
+    if col_name.startswith('ZSFz'):
         if val >= 3:
             return 'background-color: #d32f2f; color: white; font-weight: bold;'
         elif val >= 2:
@@ -282,19 +280,19 @@ def get_column_width(col_name):
     """Restituisce la larghezza ottimale per ciascuna colonna"""
     # Colonne bloccate e Nome Mercato con larghezza maggiore
     if col_name == 'Nome Mercato':
-        return 200  # Larghezza per il contenuto più lungo
+        return 200
     elif col_name == 'Div':
         return 60
     elif col_name == 'Frequenza Storica':
         return 80
     
     # Colonne numeriche compatte
-    numeric_compact = ['Partite Analizzate', 'Quota Equa', 'Ritardo Attuale', 
-                      'Prima/Dopo Media Consec Actual', 'SMA', 'EMA', 'Z-Score',
-                      'Media strisce', 'Lunghezza ciclo', 'PET', 'PQS']
+    numeric_compact = ['Partite Analizzate', 'Quota Equa', 'Ritardo Act', 
+                      'Prima/Dopo Media Consec Act', 'MM', 'EM', 'ZS',
+                      'MSt', 'LDeb', 'LFz', 'PET', 'PQS']
     
     if any(keyword in col_name for keyword in numeric_compact):
-        return 85  # Larghezza compatta per numeri
+        return 85
     
     # Default
     return 100
@@ -323,11 +321,17 @@ def apply_single_filter(df, col_name, condition, value):
             return df
     else:
         if condition == 'in':
+            # Assicura che i valori del filtro siano stringhe se la colonna è di tipo object/string
+            if df[col_name].dtype == 'object':
+                value = [str(v) for v in value]
             return df[df[col_name].isin(value)]
         elif condition == 'not_in':
+            if df[col_name].dtype == 'object':
+                value = [str(v) for v in value]
             return df[~df[col_name].isin(value)]
     
     return df
+
 
 def apply_filter_group(df, filters, group_logic):
     """Applica un gruppo di filtri con la logica interna specificata"""
@@ -378,7 +382,7 @@ if 'global_logic' not in st.session_state:
 DATA_FILE = 'data.xlsx'
 
 if not os.path.exists(DATA_FILE):
-    st.error(f"⚠️ File '{DATA_FILE}' non trovato nella directory corrente!")
+    st.error(f⚠️ File '{DATA_FILE}' non trovato nella directory corrente!")
     st.info("Assicurati che il file 'data.xlsx' sia presente nella root del progetto.")
     st.stop()
 
@@ -400,17 +404,17 @@ with st.sidebar.expander("📖 Legenda Indicatori", expanded=False):
     
     #### 📈 Indicatori Tecnici
     
-    **SMA (Simple Moving Average)**  
-    Media mobile semplice. SMA50 Attuale è la frequenza dell'evento nelle ultime 50 partite. Dà lo stesso peso a ogni partita.
+    **MM (Media Mobile)**  
+    Media mobile semplice. Es: `MM50 Act` è la frequenza dell'evento nelle ultime 50 partite.
     
-    **EMA (Exponential Moving Average)**  
-    Media mobile esponenziale. Simile alla SMA, ma dà più peso alle partite più recenti, rendendola più reattiva ai cambiamenti.
+    **EM (Media Esponenziale)**  
+    Media mobile esponenziale. Simile alla MM, ma dà più peso alle partite più recenti.
     
-    **Z-Score: Valore vs. Ciclo**
+    **ZSVal vs. ZSDeb/ZSFz**
     
-    - **Z-Score Valore** (es. Z-Score Valore SMA50): Misura la velocità/intensità del trend. Un valore molto negativo (es. -2.5) indica un ritardo intenso e recente.
+    - **ZSVal** (Z-Score Valore): Misura la velocità/intensità del trend. Un valore molto negativo (es. -2.5) indica un ritardo intenso e recente. Es: `ZSVal MM50`.
     
-    - **Z-Score ciclo Debolezza/Forza**: Misura la durata/persistenza del trend. Un valore molto positivo (es. +3.0) indica un ciclo di debolezza o forza eccezionalmente lungo.
+    - **ZSDeb/ZSFz** (Z-Score ciclo Debolezza/Forza): Misura la durata/persistenza del trend. Un valore molto positivo (es. +3.0) indica un ciclo eccezionalmente lungo.
     
     **Come si attivano i cicli di Debolezza e Forza**  
     ⚠️ Importante: i cicli non iniziano al semplice superamento della media.
@@ -423,21 +427,21 @@ with st.sidebar.expander("📖 Legenda Indicatori", expanded=False):
     
     #### 📋 Indicatori di Base
     
-    **Div**: Il campionato di riferimento (es. I1 = Serie A).
+    **Div**: Il campionato (es. I1 = Serie A).
     
-    **Nome Mercato**: Il tipo di scommessa e l'eventuale classe di quote.
+    **Nome Mercato**: Il tipo di scommessa.
     
-    **Frequenza Storica**: La percentuale di volte che l'evento si è verificato.
+    **Frequenza Storica**: La percentuale storica di occorrenza dell'evento.
     
     **Quota Equa**: La quota "giusta" calcolata dalla Frequenza Storica.
     
-    **Ritardo Attuale**: Da quante partite consecutive l'evento NON si sta verificando.
+    **Ritardo Act**: Da quante partite consecutive l'evento NON si sta verificando.
     
     **Z-Score Ritardi Consecutivi**: Misura la rarità statistica della sequenza di serie "anomale". Valori > 2 indicano una situazione molto rara.
     
-    **Z-Sc. Valore 3X**: Almeno 3 Z-Sc. Valore SMA tra 5 e 50 sono < -2 (forte ritardo)
+    **Z-Sc. Valore 3X**: Almeno 3 `ZSVal MM` tra 5 e 50 sono ≤ -2 (forte ritardo).
     
-    **Z-Sc. Deb_5-10**: gli Z-Score sui CICLI di Deb.za SMA5 E EMA10 sono >2 (Forte ritardo consecutivo oltre 1 dev std)
+    **Z-Sc. Deb_5-10**: `ZSDeb MM5` E `ZSDeb EM10` sono entrambi ≥ 2 (forte e persistente ritardo).
     
     ---
     
@@ -445,11 +449,11 @@ with st.sidebar.expander("📖 Legenda Indicatori", expanded=False):
     
     **Verde chiaro/scuro**: Valori positivi (opportunità)
     - Z-Score Ritardi: ≥2 (chiaro), ≥3 (scuro)
-    - Z-Score Valore: ≤-2 (chiaro), ≤-3 (scuro)
-    - Z-Score ciclo Debolezza: ≥2 (chiaro), ≥3 (scuro)
+    - ZSVal: ≤-2 (chiaro), ≤-3 (scuro)
+    - ZSDeb: ≥2 (chiaro), ≥3 (scuro)
     
     **Arancio/Rosso**: Valori di allerta
-    - Z-Score ciclo Forza: ≥2 (arancio), ≥3 (rosso)
+    - ZSFz: ≥2 (arancio), ≥3 (rosso)
     
     </div>
     """, unsafe_allow_html=True)
@@ -599,13 +603,15 @@ for idx, group in enumerate(st.session_state.filter_groups):
                     )
                 else:
                     unique_values = df_original[filter_config['column']].dropna().unique().tolist()
-                    unique_values = [str(v) for v in unique_values]
-                    unique_values.sort()
-                    
+                    try:
+                        unique_values.sort()
+                    except TypeError:
+                        unique_values = [str(v) for v in unique_values]
+                        unique_values.sort()
+
                     current_values = filter_config.get('value', [])
                     if not isinstance(current_values, list):
                         current_values = []
-                    current_values = [str(v) for v in current_values if str(v) in unique_values]
                     
                     filter_config['value'] = st.multiselect(
                         "Valori:",
@@ -759,7 +765,6 @@ else:
 # Info footer
 st.markdown("---")
 st.caption("💡 **Suggerimento:** I tuoi filtri sono salvati nella sessione e sopravvivono al refresh della pagina. Usa 'Reset Filtri' per ricominciare da zero.")
-
 
 
 

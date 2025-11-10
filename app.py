@@ -382,7 +382,8 @@ if 'global_logic' not in st.session_state:
 DATA_FILE = 'data.xlsx'
 
 if not os.path.exists(DATA_FILE):
-    st.error(f⚠️ File '{DATA_FILE}' non trovato nella directory corrente!")
+    # --- MODIFICA QUI ---
+    st.error(f"File '{DATA_FILE}' non trovato nella directory corrente!")
     st.info("Assicurati che il file 'data.xlsx' sia presente nella root del progetto.")
     st.stop()
 
@@ -402,7 +403,7 @@ with st.sidebar.expander("📖 Legenda Indicatori", expanded=False):
     st.markdown("""
     <div class="legenda-section">
     
-    #### 📈 Indicatori Tecnici
+    <h4>📈 Indicatori Tecnici</h4>
     
     **MM (Media Mobile)**  
     Media mobile semplice. Es: `MM50 Act` è la frequenza dell'evento nelle ultime 50 partite.
@@ -425,7 +426,7 @@ with st.sidebar.expander("📖 Legenda Indicatori", expanded=False):
     
     ---
     
-    #### 📋 Indicatori di Base
+    <h4>📋 Indicatori di Base</h4>
     
     **Div**: Il campionato (es. I1 = Serie A).
     
@@ -445,7 +446,7 @@ with st.sidebar.expander("📖 Legenda Indicatori", expanded=False):
     
     ---
     
-    #### 🎨 Legenda Colori
+    <h4>🎨 Legenda Colori</h4>
     
     **Verde chiaro/scuro**: Valori positivi (opportunità)
     - Z-Score Ritardi: ≥2 (chiaro), ≥3 (scuro)
@@ -760,7 +761,8 @@ if not df_display.empty:
         mime="text/csv"
     )
 else:
-    st.warning("⚠️ Nessun risultato trovato con i filtri applicati.")
+    # --- MODIFICA QUI ---
+    st.warning("Nessun risultato trovato con i filtri applicati.")
 
 # Info footer
 st.markdown("---")
